@@ -1,0 +1,42 @@
+appId: com.developer.powershell-command-manager
+productName: PowerShell Command Manager
+copyright: Copyright © 2024 PowerShell Command Manager
+
+directories:
+  buildResources: build
+  output: dist
+
+# Only bundle compiled output + production node_modules (electron-builder prunes devDeps automatically)
+files:
+  - out/**
+  - package.json
+
+# better-sqlite3 native .node binary cannot live inside an asar archive
+asarUnpack:
+  - node_modules/better-sqlite3/build/Release/**
+  - node_modules/better-sqlite3/lib/**
+
+# Space-free artifact names — required for Scoop-compatible URLs
+artifactName: PowerShellCmdManager-${version}-${arch}.${ext}
+
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+    - target: zip
+      arch:
+        - x64
+  icon: build/icon.ico
+  requestedExecutionLevel: asInvoker
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: PowerShell Command Manager
+  license: LICENSE
+
+publish: null

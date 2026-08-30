@@ -1,0 +1,83 @@
+@import '@xterm/xterm/css/xterm.css';
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Base ─────────────────────────────────────────────────────────────────── */
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+  overflow: hidden;
+}
+
+/* Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #30363d;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #484f58;
+}
+
+/* Allow text selection inside output areas */
+.selectable {
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+/* xterm.js container */
+.xterm-container {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+.xterm-container .xterm {
+  height: 100%;
+  padding: 8px;
+}
+
+/* Drag region for frameless window */
+.drag-region {
+  -webkit-app-region: drag;
+}
+
+.no-drag {
+  -webkit-app-region: no-drag;
+}
+
+/* Custom focus ring */
+:focus-visible {
+  outline: 2px solid #1f6feb;
+  outline-offset: 1px;
+}
+
+/* Transitions */
+.transition-colors {
+  transition-property: color, background-color, border-color;
+  transition-timing-function: ease;
+  transition-duration: 150ms;
+}
+
+/* Status pulse animation */
+@keyframes status-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.animate-status-pulse {
+  animation: status-pulse 1.5s ease-in-out infinite;
+}
