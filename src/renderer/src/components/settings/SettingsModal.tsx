@@ -1,5 +1,7 @@
 import React from 'react'
+import { FolderOpen } from 'lucide-react'
 import { Dialog } from '../ui/Dialog'
+import { Button } from '../ui/Button'
 import { useUIStore } from '../../store/uiStore'
 import { useSettingsStore } from '../../store/settingsStore'
 import type { AppSettings } from '@shared/types'
@@ -58,6 +60,35 @@ export function SettingsModal(): React.ReactElement {
             onChange={v => set('notificationsEnabled', v)}
           />
         </SettingRow>
+
+        <div className="flex flex-col gap-1.5">
+          <div>
+            <p className="text-sm font-medium text-app-text">Scripts folder</p>
+            <p className="text-xs text-app-muted mt-0.5">
+              Where scripts created with the &quot;New Script&quot; editor are saved
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              readOnly
+              value={settings.scriptsDirectory ?? ''}
+              placeholder="No folder chosen"
+              className="flex-1 h-8 px-3 text-xs bg-app-bg border border-app-border rounded-md text-app-text placeholder:text-app-muted focus:outline-none"
+            />
+            <Button
+              type="button"
+              variant="secondary"
+              size="md"
+              onClick={async () => {
+                const dir = await window.api.dialog.pickDirectory()
+                if (dir) set('scriptsDirectory', dir)
+              }}
+            >
+              <FolderOpen size={14} />
+            </Button>
+          </div>
+        </div>
 
         <SettingRow
           label="Output scrollback lines"

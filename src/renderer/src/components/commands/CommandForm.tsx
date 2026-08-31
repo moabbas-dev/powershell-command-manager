@@ -1,15 +1,20 @@
 import React, { useState, useEffect } from 'react'
-import { FolderOpen, Plus, Trash2, ChevronDown, ChevronRight } from 'lucide-react'
+import { FolderOpen, FileCode, Plus, Trash2, ChevronDown, ChevronRight } from 'lucide-react'
 import { Dialog } from '../ui/Dialog'
 import { Button } from '../ui/Button'
 import { useCommandsStore } from '../../store/commandsStore'
 import { useGroupsStore } from '../../store/groupsStore'
 import { useUIStore } from '../../store/uiStore'
-import type { CreateCommandInput, UpdateCommandInput } from '@shared/types'
+import type { CommandType, CreateCommandInput, UpdateCommandInput } from '@shared/types'
 
 interface FormState {
   name: string
+  commandType: CommandType
   command: string
+  /** Absolute path to a newly picked script file (not yet saved). */
+  scriptSourcePath: string
+  /** Display name — either the newly picked file's name, or the existing stored one. */
+  scriptFileName: string
   description: string
   workingDirectory: string
   groupId: string
@@ -21,7 +26,10 @@ interface FormState {
 
 const DEFAULT_FORM: FormState = {
   name: '',
+  commandType: 'inline',
   command: '',
+  scriptSourcePath: '',
+  scriptFileName: '',
   description: '',
   workingDirectory: '',
   groupId: '',
@@ -29,6 +37,10 @@ const DEFAULT_FORM: FormState = {
   isEnabled: true,
   autoStart: false,
   envVars: []
+}
+
+function fileNameFromPath(path: string): string {
+  return path.split(/[\\/]/).pop() ?? path
 }
 
 export function CommandForm(): React.ReactElement {
@@ -42,6 +54,7 @@ export function CommandForm(): React.ReactElement {
 
   const [form, setForm] = useState<FormState>(DEFAULT_FORM)
   const [errors, setErrors] = useState<Partial<Record<keyof FormState, string>>>({})
+  const [formError, setFormError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [advancedOpen, setAdvancedOpen] = useState(false)
 
@@ -56,7 +69,10 @@ export function CommandForm(): React.ReactElement {
       if (cmd) {
         setForm({
           name: cmd.name,
-          command: cmd.command,
+          commandType: cmd.commandType,
+          command: cmd.commandType === 'inline' ? cmd.command : '',
+          scriptSourcePath: '',
+          scriptFileName: cmd.commandType === 'script' ? (cmd.scriptFileName ?? '') : '',
           description: cmd.description ?? '',
           workingDirectory: cmd.workingDirectory ?? '',
           groupId: cmd.groupId !== null ? String(cmd.groupId) : '',
@@ -74,6 +90,7 @@ export function CommandForm(): React.ReactElement {
       setAdvancedOpen(false)
     }
     setErrors({})
+    setFormError(null)
   }, [isOpen, editingId, commands])
 
   const set = (field: keyof FormState, value: unknown): void =>
@@ -82,7 +99,14 @@ export function CommandForm(): React.ReactElement {
   const validate = (): boolean => {
     const errs: typeof errors = {}
     if (!form.name.trim()) errs.name = 'Name is required'
-    if (!form.command.trim()) errs.command = 'Command is required'
+    if (form.commandType === 'inline') {
+      if (!form.command.trim()) errs.command = 'Command is required'
+    } else {
+      const hasExistingScript = isEditing && form.scriptFileName && !form.scriptSourcePath
+      if (!form.scriptSourcePath && !hasExistingScript) {
+        errs.command = 'Please select a script file'
+      }
+    }
     setErrors(errs)
     return Object.keys(errs).length === 0
   }
@@ -90,6 +114,14 @@ export function CommandForm(): React.ReactElement {
   const handlePickDirectory = async (): Promise<void> => {
     const dir = await window.api.dialog.pickDirectory()
     if (dir) set('workingDirectory', dir)
+  }
+
+  const handlePickScript = async (): Promise<void> => {
+    const path = await window.api.dialog.pickScriptFile()
+    if (path) {
+      set('scriptSourcePath', path)
+      set('scriptFileName', fileNameFromPath(path))
+    }
   }
 
   const handleAddEnvVar = (): void => {
@@ -111,6 +143,7 @@ export function CommandForm(): React.ReactElement {
 
   const handleSubmit = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault()
+    setFormError(null)
     if (!validate()) return
     setIsSubmitting(true)
 
@@ -126,7 +159,7 @@ export function CommandForm(): React.ReactElement {
 
     const payload: CreateCommandInput | UpdateCommandInput = {
       name: form.name.trim(),
-      command: form.command.trim(),
+      commandType: form.commandType,
       description: form.description.trim() || null,
       workingDirectory: form.workingDirectory.trim() || null,
       groupId: form.groupId ? parseInt(form.groupId) : null,
@@ -134,6 +167,14 @@ export function CommandForm(): React.ReactElement {
       isEnabled: form.isEnabled,
       autoStart: form.autoStart,
       envVars: envVars && Object.keys(envVars).length > 0 ? envVars : null
+    }
+
+    if (form.commandType === 'inline') {
+      payload.command = form.command.trim()
+    } else if (form.scriptSourcePath) {
+      // Only send the source path when a new file was picked — the backend
+      // copies it and keeps the previously stored script otherwise.
+      payload.scriptSourcePath = form.scriptSourcePath
     }
 
     try {
@@ -144,7 +185,7 @@ export function CommandForm(): React.ReactElement {
       }
       closeModal()
     } catch (err) {
-      setErrors({ name: String(err) })
+      setFormError(String(err))
     } finally {
       setIsSubmitting(false)
     }
@@ -158,6 +199,12 @@ export function CommandForm(): React.ReactElement {
       maxWidth="max-w-xl"
     >
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+        {formError && (
+          <p className="text-xs text-red-400 bg-red-950/30 border border-red-900 rounded-md px-3 py-2">
+            {formError}
+          </p>
+        )}
+
         {/* Name */}
         <Field label="Name" required error={errors.name}>
           <input
@@ -170,16 +217,45 @@ export function CommandForm(): React.ReactElement {
           />
         </Field>
 
-        {/* Command */}
-        <Field label="Command" required error={errors.command}>
-          <textarea
-            value={form.command}
-            onChange={e => set('command', e.target.value)}
-            placeholder="e.g. mvn spring-boot:run"
-            rows={3}
-            className={[inputCls(!!errors.command), 'resize-y font-mono text-xs'].join(' ')}
+        {/* Command source: inline text vs. uploaded script file */}
+        <div className="flex gap-1 p-0.5 bg-app-bg border border-app-border rounded-md w-fit">
+          <TypeTab
+            label="Inline Command"
+            active={form.commandType === 'inline'}
+            onClick={() => set('commandType', 'inline')}
           />
-        </Field>
+          <TypeTab
+            label="Script File"
+            active={form.commandType === 'script'}
+            onClick={() => set('commandType', 'script')}
+          />
+        </div>
+
+        {form.commandType === 'inline' ? (
+          <Field label="Command" required error={errors.command}>
+            <textarea
+              value={form.command}
+              onChange={e => set('command', e.target.value)}
+              placeholder="e.g. mvn spring-boot:run"
+              rows={3}
+              className={[inputCls(!!errors.command), 'resize-y font-mono text-xs'].join(' ')}
+            />
+          </Field>
+        ) : (
+          <Field label="Script File" required error={errors.command}>
+            <div className="flex items-center gap-2">
+              <Button type="button" variant="secondary" size="md" onClick={handlePickScript}>
+                <FileCode size={14} /> Choose File
+              </Button>
+              <span className="text-xs text-app-text truncate">
+                {form.scriptFileName || 'No file selected'}
+              </span>
+            </div>
+            <p className="text-[11px] text-app-muted mt-1">
+              Windows only — .ps1, .bat, .cmd
+            </p>
+          </Field>
+        )}
 
         {/* Working Directory */}
         <Field label="Working Directory">
@@ -331,6 +407,29 @@ function Field({
       {children}
       {error && <p className="text-xs text-red-400">{error}</p>}
     </div>
+  )
+}
+
+function TypeTab({
+  label,
+  active,
+  onClick
+}: {
+  label: string
+  active: boolean
+  onClick: () => void
+}): React.ReactElement {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={[
+        'px-3 h-7 text-xs rounded transition-colors duration-150',
+        active ? 'bg-app-surface text-app-text' : 'text-app-muted hover:text-app-text'
+      ].join(' ')}
+    >
+      {label}
+    </button>
   )
 }
 

@@ -11,7 +11,8 @@ import type {
   UpdateGroupInput,
   ReorderItem,
   ProcessOutputEvent,
-  ProcessStatusEvent
+  ProcessStatusEvent,
+  SaveScriptResult
 } from '../shared/types'
 
 // ─── Allowed IPC Channels (security whitelist) ───────────────────────────────
@@ -34,6 +35,8 @@ const ALLOWED_INVOKE_CHANNELS = [
   'settings:get-all',
   'settings:update',
   'dialog:pick-directory',
+  'dialog:pick-script-file',
+  'scripts:save',
   'executions:recent',
   'app:quit',
   'app:minimize'
@@ -107,7 +110,13 @@ const api = {
   },
 
   dialog: {
-    pickDirectory: () => safeInvoke('dialog:pick-directory') as Promise<string | null>
+    pickDirectory: () => safeInvoke('dialog:pick-directory') as Promise<string | null>,
+    pickScriptFile: () => safeInvoke('dialog:pick-script-file') as Promise<string | null>
+  },
+
+  scripts: {
+    save: (fileName: string, content: string) =>
+      safeInvoke('scripts:save', { fileName, content }) as Promise<SaveScriptResult>
   },
 
   executions: {

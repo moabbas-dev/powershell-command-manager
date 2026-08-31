@@ -58,6 +58,15 @@ const migrations: Migration[] = [
         CREATE INDEX IF NOT EXISTS idx_executions_started   ON executions(started_at DESC);
       `)
     }
+  },
+  {
+    version: 2,
+    up: (db) => {
+      db.exec(`
+        ALTER TABLE commands ADD COLUMN command_type TEXT NOT NULL DEFAULT 'inline';
+        ALTER TABLE commands ADD COLUMN script_file_name TEXT;
+      `)
+    }
   }
 ]
 

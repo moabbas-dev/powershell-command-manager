@@ -27,6 +27,8 @@ function makeCommand(overrides: Partial<Command> = {}): Command {
     groupId: null,
     name: 'Test Command',
     command: 'echo hello',
+    commandType: 'inline',
+    scriptFileName: null,
     description: null,
     workingDirectory: null,
     envVars: null,

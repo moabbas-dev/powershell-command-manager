@@ -8,6 +8,7 @@ import { registerGroupHandlers } from './groupHandlers'
 import { registerProcessHandlers } from './processHandlers'
 import { registerSettingsHandlers } from './settingsHandlers'
 import { registerUtilityHandlers } from './utilityHandlers'
+import { registerScriptHandlers } from './scriptHandlers'
 
 export interface HandlerDeps {
   commandRepo: CommandRepository
@@ -23,4 +24,5 @@ export function registerAllHandlers(deps: HandlerDeps): void {
   registerProcessHandlers(deps.processManager)
   registerSettingsHandlers(deps.settingsRepo)
   registerUtilityHandlers(deps.executionRepo)
+  registerScriptHandlers(deps.settingsRepo)
 }

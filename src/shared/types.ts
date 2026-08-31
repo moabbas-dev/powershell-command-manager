@@ -10,11 +10,17 @@ export interface Group {
   updatedAt: number
 }
 
+export type CommandType = 'inline' | 'script'
+
 export interface Command {
   id: number
   groupId: number | null
   name: string
+  /** Inline: the PowerShell command text. Script: internal path to the stored script file. */
   command: string
+  commandType: CommandType
+  /** Original uploaded file name, for display — only set when commandType is 'script'. */
+  scriptFileName: string | null
   description: string | null
   workingDirectory: string | null
   envVars: Record<string, string> | null
@@ -65,6 +71,8 @@ export interface AppSettings {
   autoStartEnabled: boolean
   notificationsEnabled: boolean
   globalHotkey: string
+  /** Folder new scripts are saved into via the "New Script" editor. */
+  scriptsDirectory: string | null
 }
 
 // ─── Input Types ─────────────────────────────────────────────────────────────
@@ -86,7 +94,12 @@ export interface UpdateGroupInput {
 export interface CreateCommandInput {
   groupId?: number | null
   name: string
-  command: string
+  commandType?: CommandType
+  /** Required when commandType is 'inline'. */
+  command?: string
+  /** Absolute path to a script file on disk, picked via the native file dialog. Required when commandType is 'script'. */
+  scriptSourcePath?: string | null
+  scriptFileName?: string | null
   description?: string | null
   workingDirectory?: string | null
   envVars?: Record<string, string> | null
@@ -99,7 +112,11 @@ export interface CreateCommandInput {
 export interface UpdateCommandInput {
   groupId?: number | null
   name?: string
+  commandType?: CommandType
   command?: string
+  /** Absolute path to a newly picked script file — only sent when replacing the uploaded script. */
+  scriptSourcePath?: string | null
+  scriptFileName?: string | null
   description?: string | null
   workingDirectory?: string | null
   envVars?: Record<string, string> | null
@@ -113,6 +130,17 @@ export interface ReorderItem {
   id: number
   position: number
   groupId?: number | null
+}
+
+export interface SaveScriptInput {
+  fileName: string
+  content: string
+}
+
+export interface SaveScriptResult {
+  ok: boolean
+  path?: string
+  errors?: string[]
 }
 
 // ─── IPC Event Payloads ───────────────────────────────────────────────────────
@@ -154,6 +182,8 @@ export interface IpcInvokeMap {
   'settings:get-all': [void, AppSettings]
   'settings:update': [Partial<AppSettings>, void]
   'dialog:pick-directory': [void, string | null]
+  'dialog:pick-script-file': [void, string | null]
+  'scripts:save': [SaveScriptInput, SaveScriptResult]
   'executions:recent': [{ limit?: number }, RecentExecution[]]
   'app:quit': [void, void]
   'app:minimize': [void, void]

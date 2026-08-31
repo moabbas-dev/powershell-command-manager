@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { Play, Square, RotateCcw, Star, MoreHorizontal, Pencil, Trash2, Copy } from 'lucide-react'
+import { Play, Square, RotateCcw, Star, MoreHorizontal, Pencil, Trash2, Copy, FileCode } from 'lucide-react'
 import type { Command } from '@shared/types'
 import { useProcessesStore } from '../../store/processesStore'
 import { useUIStore } from '../../store/uiStore'
@@ -95,7 +95,16 @@ export function CommandItem({ command, compact = false }: CommandItemProps): Rea
       <div className="flex-1 min-w-0">
         <p className="text-xs font-medium text-app-text truncate">{command.name}</p>
         {!compact && (
-          <p className="text-[10px] text-app-muted truncate font-mono">{command.command}</p>
+          <p className="text-[10px] text-app-muted truncate font-mono flex items-center gap-1">
+            {command.commandType === 'script' && (
+              <FileCode size={10} className="flex-shrink-0" />
+            )}
+            <span className="truncate">
+              {command.commandType === 'script'
+                ? (command.scriptFileName ?? command.command)
+                : command.command}
+            </span>
+          </p>
         )}
         {startError && (
           <p className="text-[10px] text-red-400 truncate">{startError}</p>

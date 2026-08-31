@@ -11,6 +11,8 @@ interface CommandRow {
   group_id: number | null
   name: string
   command: string
+  command_type: string
+  script_file_name: string | null
   description: string | null
   working_directory: string | null
   env_vars: string | null
@@ -37,6 +39,8 @@ function rowToCommand(row: CommandRow): Command {
     groupId: row.group_id,
     name: row.name,
     command: row.command,
+    commandType: row.command_type === 'script' ? 'script' : 'inline',
+    scriptFileName: row.script_file_name,
     description: row.description,
     workingDirectory: row.working_directory,
     envVars,
@@ -120,14 +124,16 @@ export class CommandRepository {
     const result = this.db
       .prepare(
         `INSERT INTO commands
-           (group_id, name, command, description, working_directory, env_vars,
+           (group_id, name, command, command_type, script_file_name, description, working_directory, env_vars,
             is_favorite, is_enabled, auto_start, position, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
       .run(
         input.groupId ?? null,
         input.name,
-        input.command,
+        input.command ?? '',
+        input.commandType ?? 'inline',
+        input.scriptFileName ?? null,
         input.description ?? null,
         input.workingDirectory ?? null,
         input.envVars ? JSON.stringify(input.envVars) : null,
@@ -150,7 +156,7 @@ export class CommandRepository {
     this.db
       .prepare(
         `UPDATE commands SET
-           group_id = ?, name = ?, command = ?, description = ?,
+           group_id = ?, name = ?, command = ?, command_type = ?, script_file_name = ?, description = ?,
            working_directory = ?, env_vars = ?,
            is_favorite = ?, is_enabled = ?, auto_start = ?,
            position = ?, updated_at = ?
@@ -160,6 +166,8 @@ export class CommandRepository {
         input.groupId !== undefined ? input.groupId : current.groupId,
         input.name ?? current.name,
         input.command ?? current.command,
+        input.commandType ?? current.commandType,
+        input.scriptFileName !== undefined ? input.scriptFileName : current.scriptFileName,
         input.description !== undefined ? input.description : current.description,
         input.workingDirectory !== undefined ? input.workingDirectory : current.workingDirectory,
         input.envVars !== undefined

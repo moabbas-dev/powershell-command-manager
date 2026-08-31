@@ -26,7 +26,9 @@ export function useCommandSearch(groups: Group[]): {
     return commands.filter(
       cmd =>
         cmd.name.toLowerCase().includes(q) ||
-        cmd.command.toLowerCase().includes(q) ||
+        (cmd.commandType === 'script'
+          ? (cmd.scriptFileName?.toLowerCase().includes(q) ?? false)
+          : cmd.command.toLowerCase().includes(q)) ||
         (cmd.description?.toLowerCase().includes(q) ?? false)
     )
   }, [commands, query])

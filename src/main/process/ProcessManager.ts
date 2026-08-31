@@ -1,5 +1,6 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'child_process'
 import { existsSync, statSync } from 'fs'
+import { extname } from 'path'
 import { randomUUID } from 'crypto'
 import type { WebContents } from 'electron'
 import type { Command, ProcessState, ProcessStatus, ProcessOutputEvent, ProcessStatusEvent } from '@shared/types'
@@ -46,6 +47,15 @@ export class ProcessManager {
       }
       if (!statSync(command.workingDirectory).isDirectory()) {
         throw new Error(`INVALID_CWD:Working directory is not a directory: ${command.workingDirectory}`)
+      }
+    }
+
+    // Validate uploaded script still exists (it may have been deleted from disk externally)
+    if (command.commandType === 'script') {
+      if (!command.command || !existsSync(command.command)) {
+        throw new Error(
+          `INVALID_SCRIPT:Script file not found: ${command.scriptFileName ?? command.command}`
+        )
       }
     }
 
@@ -121,15 +131,13 @@ export class ProcessManager {
       env[k] = v
     }
 
-    const child = spawn(
-      'powershell.exe',
-      ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', command.command],
-      {
-        cwd: command.workingDirectory ?? undefined,
-        env,
-        windowsHide: true // CRITICAL: prevent console window from flashing
-      }
-    ) as ChildProcessWithoutNullStreams
+    const { exe, args } = this.buildSpawnArgs(command)
+
+    const child = spawn(exe, args, {
+      cwd: command.workingDirectory ?? undefined,
+      env,
+      windowsHide: true // CRITICAL: prevent console window from flashing
+    }) as ChildProcessWithoutNullStreams
 
     child.stdout.setEncoding('utf8')
     child.stderr.setEncoding('utf8')
@@ -195,6 +203,28 @@ export class ProcessManager {
     })
 
     return this.toProcessState(instance)
+  }
+
+  /** Resolves the executable + args to spawn for a command, based on its type. */
+  private buildSpawnArgs(command: Command): { exe: string; args: string[] } {
+    if (command.commandType === 'script') {
+      const ext = extname(command.command).toLowerCase()
+      if (ext === '.ps1') {
+        return {
+          exe: 'powershell.exe',
+          args: ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', command.command]
+        }
+      }
+      if (ext === '.bat' || ext === '.cmd') {
+        return { exe: 'cmd.exe', args: ['/d', '/c', command.command] }
+      }
+      throw new Error(`UNSUPPORTED_SCRIPT:Unsupported script type: ${ext || '(none)'}`)
+    }
+
+    return {
+      exe: 'powershell.exe',
+      args: ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', command.command]
+    }
   }
 
   private finalizeProcess(

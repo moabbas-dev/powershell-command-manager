@@ -1,6 +1,12 @@
 import { create } from 'zustand'
 
-export type ModalType = 'command-form' | 'group-form' | 'confirm-stop-all' | 'settings' | null
+export type ModalType =
+  | 'command-form'
+  | 'group-form'
+  | 'confirm-stop-all'
+  | 'settings'
+  | 'script-editor'
+  | null
 
 interface UIState {
   searchQuery: string
@@ -20,6 +26,7 @@ interface UIState {
   openGroupForm: (groupId?: number) => void
   openConfirm: (message: string, action: () => void) => void
   openSettings: () => void
+  openScriptEditor: () => void
   closeModal: () => void
   toggleSidebar: () => void
 }
@@ -46,6 +53,7 @@ export const useUIStore = create<UIState>(set => ({
   openConfirm: (message, action) =>
     set({ openModal: 'confirm-stop-all', confirmMessage: message, confirmAction: action }),
   openSettings: () => set({ openModal: 'settings' }),
+  openScriptEditor: () => set({ openModal: 'script-editor' }),
 
   closeModal: () =>
     set({

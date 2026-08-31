@@ -8,7 +8,8 @@ const DEFAULT_SETTINGS: AppSettings = {
   maxScrollbackLines: 10000,
   autoStartEnabled: true,
   notificationsEnabled: true,
-  globalHotkey: 'CommandOrControl+Alt+C'
+  globalHotkey: 'CommandOrControl+Alt+C',
+  scriptsDirectory: null
 }
 
 export class SettingsRepository {

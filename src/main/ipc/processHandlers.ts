@@ -16,6 +16,12 @@ export function registerProcessHandlers(manager: ProcessManager): void {
       if (message.startsWith('INVALID_CWD:')) {
         return { error: 'invalid_cwd', message: message.replace('INVALID_CWD:', '') }
       }
+      if (message.startsWith('INVALID_SCRIPT:')) {
+        return { error: 'invalid_script', message: message.replace('INVALID_SCRIPT:', '') }
+      }
+      if (message.startsWith('UNSUPPORTED_SCRIPT:')) {
+        return { error: 'unsupported_script', message: message.replace('UNSUPPORTED_SCRIPT:', '') }
+      }
       return { error: 'spawn_failed', message }
     }
   })
