@@ -38,11 +38,13 @@ body {
   -webkit-user-select: text;
 }
 
-/* xterm.js container */
+/* xterm.js container — horizontal scroll instead of line-wrapping; xterm's
+   own .xterm-viewport handles vertical scrollback internally. */
 .xterm-container {
   width: 100%;
   height: 100%;
-  overflow: hidden;
+  overflow-x: auto;
+  overflow-y: hidden;
 }
 
 .xterm-container .xterm {

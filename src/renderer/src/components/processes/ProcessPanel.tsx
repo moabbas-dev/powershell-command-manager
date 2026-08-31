@@ -59,7 +59,7 @@ export function ProcessPanel(): React.ReactElement {
                 className="absolute inset-0 flex flex-col"
                 style={{ display: p.processId === activeTabId ? 'flex' : 'none' }}
               >
-                <ProcessOutput processId={p.processId} />
+                <ProcessOutput processId={p.processId} isActive={p.processId === activeTabId} />
               </div>
             ))}
           </div>

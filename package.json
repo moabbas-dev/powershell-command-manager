@@ -1,6 +1,6 @@
 {
   "name": "powershell-command-manager",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "description": "A developer productivity tool for managing and running PowerShell commands",
   "main": "./out/main/index.js",
   "author": "PowerShell Manager",

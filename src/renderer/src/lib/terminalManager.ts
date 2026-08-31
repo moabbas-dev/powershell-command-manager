@@ -1,15 +1,30 @@
 import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
-import { SearchAddon } from '@xterm/addon-search'
+import { SearchAddon, type ISearchOptions } from '@xterm/addon-search'
 
 interface TerminalEntry {
   terminal: Terminal
   fitAddon: FitAddon
   searchAddon: SearchAddon
   element: HTMLElement | null
+  resizeTimer: ReturnType<typeof setTimeout> | null
+  /** Longest line seen so far, measured from raw incoming data (see trackMaxLineLength). */
+  maxLineLength: number
+  /** Length of the not-yet-newline-terminated line carried over between writes. */
+  pendingLineLength: number
 }
 
 const entries = new Map<string, TerminalEntry>()
+
+// Debounce the resulting resize so heavy output doesn't call it on every write —
+// only once things settle down briefly.
+const WIDTH_RESIZE_DEBOUNCE_MS = 300
+// Safety cap so one pathological ultra-long line can't blow up render width.
+const MAX_COLS = 2000
+// Strips common ANSI CSI sequences (SGR color codes etc.) before measuring
+// visible line length — not exhaustive, but covers what CLI tools typically emit.
+// eslint-disable-next-line no-control-regex -- ESC (\x1b) is the actual CSI lead byte we need to match
+const ANSI_ESCAPE_PATTERN = /\x1b\[[0-9;]*[a-zA-Z]/g
 
 const TERMINAL_OPTIONS = {
   fontSize: 13,
@@ -52,7 +67,15 @@ export function getOrCreateTerminal(processId: string): TerminalEntry {
   terminal.loadAddon(fitAddon)
   terminal.loadAddon(searchAddon)
 
-  const entry: TerminalEntry = { terminal, fitAddon, searchAddon, element: null }
+  const entry: TerminalEntry = {
+    terminal,
+    fitAddon,
+    searchAddon,
+    element: null,
+    resizeTimer: null,
+    maxLineLength: 0,
+    pendingLineLength: 0
+  }
   entries.set(processId, entry)
   return entry
 }
@@ -66,34 +89,90 @@ export function mountTerminal(processId: string, container: HTMLElement): void {
 
   // Fit after open
   requestAnimationFrame(() => {
-    try {
-      entry.fitAddon.fit()
-    } catch {
-      // Ignore if container not yet visible
-    }
+    fitTerminal(processId)
   })
 }
 
+/**
+ * Resizes to fit the container, but never narrower than the longest line
+ * written so far. This is what makes long output scroll horizontally
+ * instead of auto-wrapping, while staying compact when nothing needs the
+ * extra width.
+ *
+ * The target width MUST come from maxLineLength (tracked from raw incoming
+ * data, see trackMaxLineLength) rather than scanning the current buffer —
+ * a line longer than the terminal's cols at write time gets hard-wrapped
+ * into several buffer rows immediately, so by the time we could scan the
+ * buffer the original line length is already lost. xterm does correctly
+ * reflow those rows back into one once resized wide enough, though.
+ */
 export function fitTerminal(processId: string): void {
   const entry = entries.get(processId)
   if (!entry) return
   try {
-    entry.fitAddon.fit()
+    const proposed = entry.fitAddon.proposeDimensions()
+    if (!proposed || proposed.cols <= 0 || proposed.rows <= 0) return
+    const cols = Math.min(Math.max(proposed.cols, entry.maxLineLength), MAX_COLS)
+    entry.terminal.resize(cols, proposed.rows)
   } catch {
     // Container may not be visible
   }
 }
 
+/**
+ * Updates maxLineLength from a raw output chunk. A single logical line can
+ * arrive split across multiple writeOutput calls (piped stdout has no notion
+ * of line boundaries), so this carries the not-yet-terminated tail of a line
+ * forward via pendingLineLength instead of measuring each chunk in isolation.
+ */
+function trackMaxLineLength(entry: TerminalEntry, data: string): void {
+  const stripped = data.replace(ANSI_ESCAPE_PATTERN, '')
+  const segments = stripped.split(/\r\n|\r|\n/)
+
+  // The first segment continues whatever line was left pending.
+  const firstLineLength = entry.pendingLineLength + segments[0].length
+  if (firstLineLength > entry.maxLineLength) entry.maxLineLength = firstLineLength
+
+  if (segments.length === 1) {
+    entry.pendingLineLength = firstLineLength
+    return
+  }
+
+  // Every segment between the first and last is a complete line on its own.
+  for (let i = 1; i < segments.length - 1; i++) {
+    if (segments[i].length > entry.maxLineLength) entry.maxLineLength = segments[i].length
+  }
+
+  // The last segment starts the next pending line (empty if the chunk ended
+  // right on a line break).
+  const last = segments[segments.length - 1]
+  entry.pendingLineLength = last.length
+  if (last.length > entry.maxLineLength) entry.maxLineLength = last.length
+}
+
+function scheduleWidthResize(processId: string): void {
+  const entry = entries.get(processId)
+  if (!entry) return
+  if (entry.resizeTimer) clearTimeout(entry.resizeTimer)
+  entry.resizeTimer = setTimeout(() => {
+    entry.resizeTimer = null
+    fitTerminal(processId)
+  }, WIDTH_RESIZE_DEBOUNCE_MS)
+}
+
 export function writeOutput(processId: string, data: string): void {
   // Get-or-create so xterm buffers output even before the panel is mounted
   const entry = getOrCreateTerminal(processId)
-  entry.terminal.write(data)
+  trackMaxLineLength(entry, data)
+  entry.terminal.write(data, () => scheduleWidthResize(processId))
 }
 
 export function clearTerminal(processId: string): void {
   const entry = entries.get(processId)
   if (!entry) return
   entry.terminal.clear()
+  entry.maxLineLength = 0
+  entry.pendingLineLength = 0
 }
 
 export function getTerminalText(processId: string): string {
@@ -114,6 +193,7 @@ export function getTerminalText(processId: string): string {
 export function disposeTerminal(processId: string): void {
   const entry = entries.get(processId)
   if (!entry) return
+  if (entry.resizeTimer) clearTimeout(entry.resizeTimer)
   entry.terminal.dispose()
   entries.delete(processId)
 }
@@ -126,4 +206,28 @@ export function updateScrollback(processId: string, lines: number): void {
   // For now, accept the initial scrollback setting
   // This would require dispose + recreate to change dynamically
   void lines
+}
+
+// ─── Search ───────────────────────────────────────────────────────────────
+
+export function findInTerminal(
+  processId: string,
+  term: string,
+  direction: 'next' | 'previous',
+  incremental = false
+): boolean {
+  const entry = entries.get(processId)
+  if (!entry || !term) return false
+  // No `decorations` option here — it requires allowProposedApi: true on the
+  // Terminal, which we deliberately keep off. Matches still get selected and
+  // scrolled into view via xterm's built-in selection highlighting.
+  const options: ISearchOptions = { incremental }
+  return direction === 'next'
+    ? entry.searchAddon.findNext(term, options)
+    : entry.searchAddon.findPrevious(term, options)
+}
+
+export function clearTerminalSearch(processId: string): void {
+  const entry = entries.get(processId)
+  entry?.searchAddon.clearDecorations()
 }
