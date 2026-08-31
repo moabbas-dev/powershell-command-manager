@@ -132,15 +132,23 @@ export interface ReorderItem {
   groupId?: number | null
 }
 
+export type ScriptExtension = 'ps1' | 'bat' | 'cmd'
+
 export interface SaveScriptInput {
   fileName: string
+  extension: ScriptExtension
   content: string
+  description?: string | null
+  /** The linked command's id, once created — omit/null on the first save of a session. */
+  commandId?: number | null
 }
 
 export interface SaveScriptResult {
   ok: boolean
   path?: string
   errors?: string[]
+  /** The created-or-updated command's id, so the caller can keep saving to the same command. */
+  commandId?: number
 }
 
 export interface DbActionResult {

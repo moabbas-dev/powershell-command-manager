@@ -4,8 +4,17 @@ import { Dialog } from '../ui/Dialog'
 import { Button } from '../ui/Button'
 import { useUIStore } from '../../store/uiStore'
 import { useSettingsStore } from '../../store/settingsStore'
+import { useCommandsStore } from '../../store/commandsStore'
+import type { ScriptExtension } from '@shared/types'
 
 const AUTOSAVE_DELAY_MS = 1500
+const EXTENSIONS: ScriptExtension[] = ['ps1', 'bat', 'cmd']
+
+const CONTENT_PLACEHOLDER: Record<ScriptExtension, string> = {
+  ps1: 'Write-Host "Hello, world!"',
+  bat: '@echo off\necho Hello, world!',
+  cmd: '@echo off\necho Hello, world!'
+}
 
 type SaveStatus = 'idle' | 'saving' | 'saved' | 'error'
 
@@ -14,14 +23,18 @@ export function ScriptEditorModal(): React.ReactElement {
   const closeModal = useUIStore(s => s.closeModal)
   const openSettings = useUIStore(s => s.openSettings)
   const scriptsDirectory = useSettingsStore(s => s.settings.scriptsDirectory)
+  const loadCommands = useCommandsStore(s => s.load)
 
   const isOpen = openModal === 'script-editor'
 
   const [fileName, setFileName] = useState('')
+  const [extension, setExtension] = useState<ScriptExtension>('ps1')
+  const [description, setDescription] = useState('')
   const [content, setContent] = useState('')
   const [status, setStatus] = useState<SaveStatus>('idle')
   const [errors, setErrors] = useState<string[]>([])
   const [savedPath, setSavedPath] = useState<string | null>(null)
+  const [commandId, setCommandId] = useState<number | null>(null)
 
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const requestIdRef = useRef(0)
@@ -30,13 +43,17 @@ export function ScriptEditorModal(): React.ReactElement {
   useEffect(() => {
     if (!isOpen) return
     setFileName('')
+    setExtension('ps1')
+    setDescription('')
     setContent('')
     setStatus('idle')
     setErrors([])
     setSavedPath(null)
+    setCommandId(null)
   }, [isOpen])
 
-  // Debounced validate-and-save
+  // Debounced validate-and-save — also creates or updates a runnable command
+  // for this script, so it shows up in the sidebar immediately.
   useEffect(() => {
     if (!isOpen) return
     if (timerRef.current) clearTimeout(timerRef.current)
@@ -59,13 +76,15 @@ export function ScriptEditorModal(): React.ReactElement {
       setStatus('saving')
 
       window.api.scripts
-        .save(fileName, content)
+        .save({ fileName, extension, content, description, commandId })
         .then(result => {
           if (requestId !== requestIdRef.current) return // superseded by newer input
           if (result.ok) {
             setStatus('saved')
             setSavedPath(result.path ?? null)
             setErrors([])
+            if (result.commandId !== undefined) setCommandId(result.commandId)
+            void loadCommands()
           } else {
             setStatus('error')
             setErrors(result.errors ?? ['Save failed'])
@@ -81,7 +100,7 @@ export function ScriptEditorModal(): React.ReactElement {
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current)
     }
-  }, [fileName, content, isOpen, scriptsDirectory])
+  }, [fileName, extension, description, content, isOpen, scriptsDirectory, commandId, loadCommands])
 
   return (
     <Dialog open={isOpen} onClose={closeModal} title="New Script" maxWidth="max-w-2xl">
@@ -114,8 +133,35 @@ export function ScriptEditorModal(): React.ReactElement {
               disabled={!scriptsDirectory}
               className="w-full h-8 px-3 text-xs bg-app-bg border border-app-border rounded-md text-app-text placeholder:text-app-muted focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/30 disabled:opacity-50"
             />
-            <span className="text-xs text-app-muted flex-shrink-0">.ps1</span>
+            <span className="text-xs text-app-muted flex-shrink-0">.</span>
+            <select
+              value={extension}
+              onChange={e => setExtension(e.target.value as ScriptExtension)}
+              disabled={!scriptsDirectory}
+              className="h-8 px-2 text-xs bg-app-bg border border-app-border rounded-md text-app-text focus:outline-none focus:border-blue-500 disabled:opacity-50"
+            >
+              {EXTENSIONS.map(ext => (
+                <option key={ext} value={ext}>
+                  {ext}
+                </option>
+              ))}
+            </select>
           </div>
+          <p className="text-[11px] text-app-muted">
+            Also used as the command name — this script becomes runnable from the sidebar.
+          </p>
+        </div>
+
+        <div className="flex flex-col gap-1">
+          <label className="text-xs font-medium text-app-muted">Description</label>
+          <input
+            type="text"
+            value={description}
+            onChange={e => setDescription(e.target.value)}
+            placeholder="Optional"
+            disabled={!scriptsDirectory}
+            className="w-full h-8 px-3 text-xs bg-app-bg border border-app-border rounded-md text-app-text placeholder:text-app-muted focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/30 disabled:opacity-50"
+          />
         </div>
 
         <div className="flex flex-col gap-1">
@@ -123,7 +169,7 @@ export function ScriptEditorModal(): React.ReactElement {
           <textarea
             value={content}
             onChange={e => setContent(e.target.value)}
-            placeholder={'Write-Host "Hello, world!"'}
+            placeholder={CONTENT_PLACEHOLDER[extension]}
             rows={14}
             disabled={!scriptsDirectory}
             className="w-full px-3 py-2 text-xs font-mono bg-app-bg border border-app-border rounded-md text-app-text resize-y focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/30 disabled:opacity-50"
@@ -167,7 +213,7 @@ function StatusBar({
     return (
       <div className="flex items-center gap-1.5 text-xs text-green-400 truncate">
         <CheckCircle2 size={12} className="flex-shrink-0" />
-        <span className="truncate">Saved to {savedPath}</span>
+        <span className="truncate">Saved to {savedPath} — ready to run from the sidebar</span>
       </div>
     )
   }

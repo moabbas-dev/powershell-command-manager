@@ -25,6 +25,6 @@ export function registerAllHandlers(deps: HandlerDeps): void {
   registerProcessHandlers(deps.processManager)
   registerSettingsHandlers(deps.settingsRepo)
   registerUtilityHandlers(deps.executionRepo)
-  registerScriptHandlers(deps.settingsRepo)
+  registerScriptHandlers(deps.settingsRepo, deps.commandRepo)
   registerDatabaseHandlers()
 }

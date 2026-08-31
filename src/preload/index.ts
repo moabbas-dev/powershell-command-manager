@@ -12,6 +12,7 @@ import type {
   ReorderItem,
   ProcessOutputEvent,
   ProcessStatusEvent,
+  SaveScriptInput,
   SaveScriptResult,
   DbActionResult
 } from '../shared/types'
@@ -118,8 +119,8 @@ const api = {
   },
 
   scripts: {
-    save: (fileName: string, content: string) =>
-      safeInvoke('scripts:save', { fileName, content }) as Promise<SaveScriptResult>
+    save: (input: SaveScriptInput) =>
+      safeInvoke('scripts:save', input) as Promise<SaveScriptResult>
   },
 
   db: {
