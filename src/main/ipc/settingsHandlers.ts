@@ -9,7 +9,8 @@ const SettingsUpdateSchema = z.object({
   maxScrollbackLines: z.number().int().min(100).max(100000).optional(),
   autoStartEnabled: z.boolean().optional(),
   notificationsEnabled: z.boolean().optional(),
-  globalHotkey: z.string().optional()
+  globalHotkey: z.string().optional(),
+  scriptsDirectory: z.string().nullable().optional()
 })
 
 export function registerSettingsHandlers(repo: SettingsRepository): void {
