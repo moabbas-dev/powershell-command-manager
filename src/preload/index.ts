@@ -12,7 +12,8 @@ import type {
   ReorderItem,
   ProcessOutputEvent,
   ProcessStatusEvent,
-  SaveScriptResult
+  SaveScriptResult,
+  DbActionResult
 } from '../shared/types'
 
 // ─── Allowed IPC Channels (security whitelist) ───────────────────────────────
@@ -37,6 +38,8 @@ const ALLOWED_INVOKE_CHANNELS = [
   'dialog:pick-directory',
   'dialog:pick-script-file',
   'scripts:save',
+  'db:export',
+  'db:import',
   'executions:recent',
   'app:quit',
   'app:minimize'
@@ -117,6 +120,11 @@ const api = {
   scripts: {
     save: (fileName: string, content: string) =>
       safeInvoke('scripts:save', { fileName, content }) as Promise<SaveScriptResult>
+  },
+
+  db: {
+    export: () => safeInvoke('db:export') as Promise<DbActionResult>,
+    import: () => safeInvoke('db:import') as Promise<DbActionResult>
   },
 
   executions: {

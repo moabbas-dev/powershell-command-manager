@@ -9,6 +9,7 @@ import { registerProcessHandlers } from './processHandlers'
 import { registerSettingsHandlers } from './settingsHandlers'
 import { registerUtilityHandlers } from './utilityHandlers'
 import { registerScriptHandlers } from './scriptHandlers'
+import { registerDatabaseHandlers } from './databaseHandlers'
 
 export interface HandlerDeps {
   commandRepo: CommandRepository
@@ -25,4 +26,5 @@ export function registerAllHandlers(deps: HandlerDeps): void {
   registerSettingsHandlers(deps.settingsRepo)
   registerUtilityHandlers(deps.executionRepo)
   registerScriptHandlers(deps.settingsRepo)
+  registerDatabaseHandlers()
 }

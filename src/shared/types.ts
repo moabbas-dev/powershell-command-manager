@@ -143,6 +143,14 @@ export interface SaveScriptResult {
   errors?: string[]
 }
 
+export interface DbActionResult {
+  ok: boolean
+  path?: string
+  error?: string
+  canceled?: boolean
+  relaunching?: boolean
+}
+
 // ─── IPC Event Payloads ───────────────────────────────────────────────────────
 
 export interface ProcessOutputEvent {
@@ -184,6 +192,8 @@ export interface IpcInvokeMap {
   'dialog:pick-directory': [void, string | null]
   'dialog:pick-script-file': [void, string | null]
   'scripts:save': [SaveScriptInput, SaveScriptResult]
+  'db:export': [void, DbActionResult]
+  'db:import': [void, DbActionResult]
   'executions:recent': [{ limit?: number }, RecentExecution[]]
   'app:quit': [void, void]
   'app:minimize': [void, void]

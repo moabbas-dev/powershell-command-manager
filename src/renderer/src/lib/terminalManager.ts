@@ -106,7 +106,9 @@ export function getTerminalText(processId: string): string {
     const line = buffer.getLine(i)
     if (line) lines.push(line.translateToString(true))
   }
-  return lines.join('\n')
+  // xterm's scrollback buffer pads unused rows as blank lines — trim them
+  // from both ends so copied output doesn't carry leading/trailing blanks.
+  return lines.join('\n').trim()
 }
 
 export function disposeTerminal(processId: string): void {
