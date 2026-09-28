@@ -1,11 +1,11 @@
 {
-  "version": "1.4.0",
+  "version": "1.5.0",
   "description": "Developer productivity tool for managing and running multiple PowerShell processes",
   "homepage": "https://github.com/moabbas-dev/powershell-command-manager",
   "license": "MIT",
 
-  "url": "https://github.com/moabbas-dev/powershell-command-manager/releases/download/v1.4.0/PowerShellCmdManager-1.4.0-x64.zip",
-  "hash": "48aee7d19f8cbfd760ba6707b4e208cfc397249c11c7a755a353c4391688d712",
+  "url": "https://github.com/moabbas-dev/powershell-command-manager/releases/download/v1.5.0/PowerShellCmdManager-1.5.0-x64.zip",
+  "hash": "95a4ec6fbc3e972caa09a2ffa9224b923bc036d7241c2e239fec43a70e47587b",
 
   "shortcuts": [
     ["PowerShell Command Manager.exe", "PowerShell Command Manager"]
