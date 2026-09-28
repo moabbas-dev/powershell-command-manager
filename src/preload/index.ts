@@ -14,7 +14,8 @@ import type {
   ProcessStatusEvent,
   SaveScriptInput,
   SaveScriptResult,
-  DbActionResult
+  DbActionResult,
+  SecurityScanResult
 } from '../shared/types'
 
 // ─── Allowed IPC Channels (security whitelist) ───────────────────────────────
@@ -41,6 +42,7 @@ const ALLOWED_INVOKE_CHANNELS = [
   'scripts:save',
   'db:export',
   'db:import',
+  'security:pick-and-scan-file',
   'executions:recent',
   'app:quit',
   'app:minimize'
@@ -126,6 +128,10 @@ const api = {
   db: {
     export: () => safeInvoke('db:export') as Promise<DbActionResult>,
     import: () => safeInvoke('db:import') as Promise<DbActionResult>
+  },
+
+  security: {
+    pickAndScanFile: () => safeInvoke('security:pick-and-scan-file') as Promise<SecurityScanResult>
   },
 
   executions: {

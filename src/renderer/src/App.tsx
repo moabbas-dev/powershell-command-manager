@@ -6,6 +6,7 @@ import { CommandForm } from './components/commands/CommandForm'
 import { GroupForm } from './components/groups/GroupForm'
 import { SettingsModal } from './components/settings/SettingsModal'
 import { ScriptEditorModal } from './components/scripts/ScriptEditorModal'
+import { SecurityScanModal } from './components/security/SecurityScanModal'
 import { ConfirmDialog } from './components/ui/ConfirmDialog'
 import { useCommandsStore } from './store/commandsStore'
 import { useGroupsStore } from './store/groupsStore'
@@ -53,6 +54,7 @@ export default function App(): React.ReactElement {
       <GroupForm />
       <SettingsModal />
       <ScriptEditorModal />
+      <SecurityScanModal />
       <ConfirmDialog
         open={openModal === 'confirm-stop-all'}
         message={confirmMessage}

@@ -159,6 +159,34 @@ export interface DbActionResult {
   relaunching?: boolean
 }
 
+export interface DefenderInfo {
+  engineVersion?: string
+  signatureVersion?: string
+  /** ISO 8601 timestamp, if Defender reported one. */
+  signatureLastUpdated?: string
+  productVersion?: string
+}
+
+export interface SecurityScanResult {
+  ok: boolean
+  canceled?: boolean
+  /** Set when ok is false and canceled is falsy — a real failure (bad path, unreadable file, etc). */
+  error?: string
+  fileName?: string
+  filePath?: string
+  fileSizeBytes?: number
+  /** Epoch ms. */
+  scannedAt?: number
+  /** True only if Defender actually completed a scan, regardless of outcome. */
+  scanned?: boolean
+  clean?: boolean
+  threats?: string[]
+  rawOutput?: string
+  /** Set when scanned is false — why no verdict could be produced. */
+  scanError?: string
+  defender?: DefenderInfo
+}
+
 // ─── IPC Event Payloads ───────────────────────────────────────────────────────
 
 export interface ProcessOutputEvent {
@@ -202,6 +230,7 @@ export interface IpcInvokeMap {
   'scripts:save': [SaveScriptInput, SaveScriptResult]
   'db:export': [void, DbActionResult]
   'db:import': [void, DbActionResult]
+  'security:pick-and-scan-file': [void, SecurityScanResult]
   'executions:recent': [{ limit?: number }, RecentExecution[]]
   'app:quit': [void, void]
   'app:minimize': [void, void]

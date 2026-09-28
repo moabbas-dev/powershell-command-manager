@@ -6,6 +6,7 @@ export type ModalType =
   | 'confirm-stop-all'
   | 'settings'
   | 'script-editor'
+  | 'security-scan'
   | null
 
 interface UIState {
@@ -27,6 +28,7 @@ interface UIState {
   openConfirm: (message: string, action: () => void) => void
   openSettings: () => void
   openScriptEditor: () => void
+  openSecurityScan: () => void
   closeModal: () => void
   toggleSidebar: () => void
 }
@@ -54,6 +56,7 @@ export const useUIStore = create<UIState>(set => ({
     set({ openModal: 'confirm-stop-all', confirmMessage: message, confirmAction: action }),
   openSettings: () => set({ openModal: 'settings' }),
   openScriptEditor: () => set({ openModal: 'script-editor' }),
+  openSecurityScan: () => set({ openModal: 'security-scan' }),
 
   closeModal: () =>
     set({

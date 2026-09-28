@@ -25,6 +25,16 @@ export interface ScanResult {
   threats: string[]
   /** Set when scanned is false — why no verdict could be produced. */
   error?: string
+  /** Full stdout from MpCmdRun, for callers that want to show it verbatim. */
+  rawOutput: string
+}
+
+export interface DefenderInfo {
+  engineVersion?: string
+  signatureVersion?: string
+  /** ISO 8601 timestamp, if Defender reported one. */
+  signatureLastUpdated?: string
+  productVersion?: string
 }
 
 let cachedDefenderPath: string | null | undefined
@@ -55,6 +65,7 @@ export function scanFileForViruses(filePath: string): Promise<ScanResult> {
         scanned: false,
         clean: true,
         threats: [],
+        rawOutput: '',
         error: 'Windows Defender was not found on this system'
       })
       return
@@ -70,19 +81,19 @@ export function scanFileForViruses(filePath: string): Promise<ScanResult> {
     child.stdout.on('data', chunk => (stdout += chunk))
 
     child.on('error', err => {
-      resolve({ scanned: false, clean: true, threats: [], error: err.message })
+      resolve({ scanned: false, clean: true, threats: [], rawOutput: stdout, error: err.message })
     })
 
     child.on('close', () => {
       if (NO_THREATS_PATTERN.test(stdout)) {
-        resolve({ scanned: true, clean: true, threats: [] })
+        resolve({ scanned: true, clean: true, threats: [], rawOutput: stdout })
         return
       }
 
       const countMatch = stdout.match(THREAT_COUNT_PATTERN)
       if (countMatch && parseInt(countMatch[1], 10) > 0) {
         const threats = [...stdout.matchAll(THREAT_NAME_PATTERN)].map(m => m[1].trim())
-        resolve({ scanned: true, clean: false, threats })
+        resolve({ scanned: true, clean: false, threats, rawOutput: stdout })
         return
       }
 
@@ -90,8 +101,53 @@ export function scanFileForViruses(filePath: string): Promise<ScanResult> {
         scanned: false,
         clean: true,
         threats: [],
+        rawOutput: stdout,
         error: `Defender scan did not complete: ${stdout.trim() || 'no output'}`
       })
+    })
+  })
+}
+
+/** Fetches Windows Defender's engine/signature info for display alongside a scan result. */
+export function getDefenderInfo(): Promise<DefenderInfo> {
+  return new Promise(resolve => {
+    const child = spawn(
+      'powershell.exe',
+      [
+        '-NoProfile',
+        '-NonInteractive',
+        '-ExecutionPolicy',
+        'Bypass',
+        '-Command',
+        'Get-MpComputerStatus | ' +
+          'Select-Object AMEngineVersion, AntivirusSignatureVersion, AntivirusSignatureLastUpdated, AMProductVersion | ' +
+          'ConvertTo-Json -Compress'
+      ],
+      { windowsHide: true }
+    )
+
+    let stdout = ''
+    child.stdout.on('data', chunk => (stdout += chunk))
+    child.on('error', () => resolve({}))
+    child.on('close', () => {
+      try {
+        const parsed = JSON.parse(stdout.trim()) as {
+          AMEngineVersion?: string
+          AntivirusSignatureVersion?: string
+          AntivirusSignatureLastUpdated?: string
+          AMProductVersion?: string
+        }
+        // PowerShell's ConvertTo-Json renders DateTime as "/Date(<epochMs>)/".
+        const epochMatch = parsed.AntivirusSignatureLastUpdated?.match(/\d+/)
+        resolve({
+          engineVersion: parsed.AMEngineVersion,
+          signatureVersion: parsed.AntivirusSignatureVersion,
+          signatureLastUpdated: epochMatch ? new Date(Number(epochMatch[0])).toISOString() : undefined,
+          productVersion: parsed.AMProductVersion
+        })
+      } catch {
+        resolve({})
+      }
     })
   })
 }

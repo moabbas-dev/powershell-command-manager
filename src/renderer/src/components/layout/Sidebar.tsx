@@ -1,5 +1,5 @@
 import React from 'react'
-import { Plus, FolderPlus, FileCode } from 'lucide-react'
+import { Plus, FolderPlus, FileCode, ShieldCheck } from 'lucide-react'
 import { SearchBar } from '../commands/SearchBar'
 import { CommandList } from '../commands/CommandList'
 import { Button } from '../ui/Button'
@@ -10,6 +10,7 @@ export function Sidebar(): React.ReactElement {
   const openCommandForm = useUIStore(s => s.openCommandForm)
   const openGroupForm = useUIStore(s => s.openGroupForm)
   const openScriptEditor = useUIStore(s => s.openScriptEditor)
+  const openSecurityScan = useUIStore(s => s.openSecurityScan)
 
   return (
     <div className="flex flex-col w-60 flex-shrink-0 border-r border-app-border bg-app-sidebar overflow-hidden">
@@ -40,6 +41,11 @@ export function Sidebar(): React.ReactElement {
         <Tooltip content="New script">
           <Button variant="secondary" size="sm" onClick={() => openScriptEditor()}>
             <FileCode size={13} />
+          </Button>
+        </Tooltip>
+        <Tooltip content="Security check">
+          <Button variant="secondary" size="sm" onClick={() => openSecurityScan()}>
+            <ShieldCheck size={13} />
           </Button>
         </Tooltip>
       </div>

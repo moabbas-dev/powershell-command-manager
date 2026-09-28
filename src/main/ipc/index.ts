@@ -10,6 +10,7 @@ import { registerSettingsHandlers } from './settingsHandlers'
 import { registerUtilityHandlers } from './utilityHandlers'
 import { registerScriptHandlers } from './scriptHandlers'
 import { registerDatabaseHandlers } from './databaseHandlers'
+import { registerSecurityHandlers } from './securityHandlers'
 
 export interface HandlerDeps {
   commandRepo: CommandRepository
@@ -27,4 +28,5 @@ export function registerAllHandlers(deps: HandlerDeps): void {
   registerUtilityHandlers(deps.executionRepo)
   registerScriptHandlers(deps.settingsRepo, deps.commandRepo)
   registerDatabaseHandlers()
+  registerSecurityHandlers()
 }
