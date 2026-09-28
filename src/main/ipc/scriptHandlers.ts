@@ -1,11 +1,14 @@
 import { ipcMain } from 'electron'
 import { z } from 'zod'
-import { existsSync, statSync, writeFileSync } from 'fs'
+import { existsSync, statSync, writeFileSync, unlinkSync } from 'fs'
 import { join, basename } from 'path'
+import { tmpdir } from 'os'
+import { randomUUID } from 'crypto'
 import type { SettingsRepository } from '../database/repositories/SettingsRepository'
 import type { CommandRepository } from '../database/repositories/CommandRepository'
 import type { SaveScriptResult } from '../../shared/types'
 import { validatePowerShellScript } from '../scripts/scriptValidator'
+import { scanFileForViruses } from '../scripts/virusScanner'
 import { deleteScript } from '../files/scriptStorage'
 
 const SCRIPT_EXTENSIONS = ['ps1', 'bat', 'cmd'] as const
@@ -76,10 +79,40 @@ export async function saveScriptAndLinkCommand(
   const previousPath =
     existingCommand && existingCommand.commandType === 'script' ? existingCommand.command : null
 
+  // Write to a temp location first and scan it there — never let unscanned
+  // content land in the user's actual scripts folder, and never let a bad
+  // autosave attempt disturb the previously-saved-good version.
+  const tempPath = join(tmpdir(), `pscm-scan-${randomUUID()}.${extension}`)
+  try {
+    writeFileSync(tempPath, content, 'utf8')
+  } catch (err) {
+    return { ok: false, errors: [`Failed to save script: ${String(err)}`] }
+  }
+
+  const scan = await scanFileForViruses(tempPath)
+  if (!scan.clean) {
+    try {
+      unlinkSync(tempPath)
+    } catch {
+      // non-fatal
+    }
+    const threatList = scan.threats.join(', ') || 'unknown threat'
+    return {
+      ok: false,
+      errors: [`Windows Defender flagged this content (${threatList}). It was not saved.`]
+    }
+  }
+
   try {
     writeFileSync(targetPath, content, 'utf8')
   } catch (err) {
     return { ok: false, errors: [`Failed to save script: ${String(err)}`] }
+  } finally {
+    try {
+      unlinkSync(tempPath)
+    } catch {
+      // non-fatal
+    }
   }
 
   const commandInput = {

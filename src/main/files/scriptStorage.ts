@@ -2,6 +2,7 @@ import { app } from 'electron'
 import { existsSync, mkdirSync, copyFileSync, unlinkSync, statSync } from 'fs'
 import { join, extname, basename } from 'path'
 import { randomUUID } from 'crypto'
+import { scanFileForViruses } from '../scripts/virusScanner'
 
 /** Windows shell script types this app knows how to run. */
 export const ALLOWED_SCRIPT_EXTENSIONS = ['.ps1', '.bat', '.cmd'] as const
@@ -17,8 +18,11 @@ function getScriptsDir(): string {
 /**
  * Copies a user-picked script file into app storage so the command keeps
  * working even if the original file is later moved, renamed, or deleted.
+ * Scans the source with Windows Defender before copying it in.
  */
-export function saveScript(sourcePath: string): { storedPath: string; originalName: string } {
+export async function saveScript(
+  sourcePath: string
+): Promise<{ storedPath: string; originalName: string }> {
   if (!existsSync(sourcePath)) {
     throw new Error(`INVALID_SCRIPT:Script file not found: ${sourcePath}`)
   }
@@ -38,11 +42,29 @@ export function saveScript(sourcePath: string): { storedPath: string; originalNa
     )
   }
 
+  const scan = await scanFileForViruses(sourcePath)
+  if (!scan.clean) {
+    const threatList = scan.threats.join(', ') || 'unknown threat'
+    throw new Error(
+      `INFECTED_SCRIPT:Windows Defender flagged this file (${threatList}). It was not imported.`
+    )
+  }
+
   const originalName = basename(sourcePath)
   const storedPath = join(getScriptsDir(), `${randomUUID()}${ext}`)
   copyFileSync(sourcePath, storedPath)
 
   return { storedPath, originalName }
+}
+
+/**
+ * Strips the `CODE:` prefix used internally to categorize saveScript() errors
+ * (matched elsewhere, e.g. processHandlers.ts) so callers that don't need the
+ * category can surface a clean message to the user.
+ */
+export function formatScriptError(err: unknown): string {
+  const message = err instanceof Error ? err.message : String(err)
+  return message.replace(/^(INVALID_SCRIPT|INFECTED_SCRIPT):/, '')
 }
 
 /** Removes a previously stored script copy. Safe to call even if already gone. */

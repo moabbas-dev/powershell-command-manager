@@ -1,7 +1,7 @@
 import { ipcMain } from 'electron'
 import { z } from 'zod'
 import type { CommandRepository } from '../database/repositories/CommandRepository'
-import { saveScript, deleteScript } from '../files/scriptStorage'
+import { saveScript, deleteScript, formatScriptError } from '../files/scriptStorage'
 import type { UpdateCommandInput } from '../../shared/types'
 
 const CommandTypeSchema = z.enum(['inline', 'script'])
@@ -58,12 +58,17 @@ export function registerCommandHandlers(repo: CommandRepository): void {
     return repo.list(payload?.groupId)
   })
 
-  ipcMain.handle('commands:create', (_event, payload: unknown) => {
+  ipcMain.handle('commands:create', async (_event, payload: unknown) => {
     const input = CreateCommandSchema.parse(payload)
     const commandType = input.commandType ?? 'inline'
 
     if (commandType === 'script') {
-      const { storedPath, originalName } = saveScript(input.scriptSourcePath!.trim())
+      let storedPath: string, originalName: string
+      try {
+        ;({ storedPath, originalName } = await saveScript(input.scriptSourcePath!.trim()))
+      } catch (err) {
+        throw new Error(formatScriptError(err))
+      }
       return repo.create({
         ...input,
         commandType,
@@ -80,7 +85,7 @@ export function registerCommandHandlers(repo: CommandRepository): void {
     })
   })
 
-  ipcMain.handle('commands:update', (_event, payload: unknown) => {
+  ipcMain.handle('commands:update', async (_event, payload: unknown) => {
     const { id, scriptSourcePath, ...rest } = UpdateCommandSchema.parse(payload)
     const current = repo.getById(id)
     if (!current) throw new Error(`Command ${id} not found`)
@@ -91,7 +96,12 @@ export function registerCommandHandlers(repo: CommandRepository): void {
     if (nextType === 'script') {
       patch.commandType = 'script'
       if (scriptSourcePath?.trim()) {
-        const { storedPath, originalName } = saveScript(scriptSourcePath.trim())
+        let storedPath: string, originalName: string
+        try {
+          ;({ storedPath, originalName } = await saveScript(scriptSourcePath.trim()))
+        } catch (err) {
+          throw new Error(formatScriptError(err))
+        }
         if (current.commandType === 'script' && current.command) deleteScript(current.command)
         patch.command = storedPath
         patch.scriptFileName = originalName
